@@ -20,6 +20,35 @@ VALIDATE = 2
 class OASISDataset(torch.utils.data.Dataset):
     def __init__(self, img_dir_path):
         '''
+        Loads the contents of the provided directory into an
+        easily processed form.
+        '''
+        # Load all file names from the provided directory
+        files = os.listdir(f"{img_dir_path}")
+
+        # Initialise member variables
+        self.path = img_dir_path
+        self.files = files
+        self.transform = transforms.Compose([
+            transforms.Resize((256, 256)),
+            transforms.ToTensor()
+            ])
+        self.num_samples = len(files)
+
+    def __len__(self):
+        return self.num_samples
+
+    def __getitem__(self, idx):
+        # Load all slices of the sample
+        image = Image.open(f"{self.path}/{self.files[idx]}").convert('L')
+        image = self.transform(image)
+
+        return image, torch.tensor(idx, dtype=torch.long)
+
+
+class OASISDataset_3D(torch.utils.data.Dataset):
+    def __init__(self, img_dir_path):
+        '''
         Load dataset metadata, assuming image name is of the form
         ???_xxx_???_yyy.???
         where xxx and yyy are the sample and slice indices
