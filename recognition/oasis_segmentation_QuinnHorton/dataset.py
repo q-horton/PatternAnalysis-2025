@@ -1,16 +1,24 @@
 from PIL import Image
 import os
 import torch
-from torchvision import datasets, transforms
+from torchvision import transforms
 from dotenv import load_dotenv
 
 # Load relevant environment variables
 load_dotenv()
 OASIS_PATH = os.getenv('OASIS_PATH')
+TRAINING_FOLDER = os.getenv('TRAINING_FOLDER')
+TESTING_FOLDER = os.getenv('TESTING_FOLDER')
+VALIDATION_FOLDER = os.getenv('VALIDATION_FOLDER')
+
+# Constant values
+TEST = 0
+TRAIN = 1
+VALIDATE = 2
 
 
 class OASISDataset(torch.utils.data.Dataset):
-    def __init__(self, img_dir_path, transform=None):
+    def __init__(self, img_dir_path):
         '''
         Load dataset metadata, assuming image name is of the form
         ???_xxx_???_yyy.???
@@ -19,6 +27,14 @@ class OASISDataset(torch.utils.data.Dataset):
         '''
         # Load all file names from the provided directory
         files = os.listdir(f"{img_dir_path}")
+
+        # Extract all of the sample IDs in the file paths
+        sample_ids = []
+        for i in files:
+            idx = int(i.split("_", 2)[1])
+            if idx not in sample_ids:
+                sample_ids.append(idx)
+        sample_ids.sort()
 
         # Process file names to establish data size
         prototype, extension = files[0].split(".", 1)
@@ -32,44 +48,45 @@ class OASISDataset(torch.utils.data.Dataset):
 
         # Initialise member variables
         self.path = img_dir_path
-        self.transform = transform
+        self.transform = transforms.Compose([
+            transforms.Resize((256, 256)),
+            transforms.ToTensor()
+            ])
         self.num_samples = int(len(files) / num_slices)
         self.sample_slices = num_slices
         self.naming_vars = [name_s[0], name_s[2], extension]
+        self.sample_ids = sample_ids
 
     def __len__(self):
         return self.num_samples
 
     def __getitem__(self, idx):
-        # Load image (example for a common image format, adjust for NIfTI)
-        image = Image.open(self.image_paths[idx]).convert('RGB')
-        label = self.labels[idx]
-
-        if self.transform:
+        # Load all slices of the sample
+        slices = []
+        id = self.sample_ids[idx]
+        for i in range(self.sample_slices):
+            file = f"{self.path}/{self.naming_vars[0]}_{id:03d}_" +\
+                    f"{self.naming_vars[1]}_{i}.{self.naming_vars[2]}"
+            image = Image.open(file).convert('L')
             image = self.transform(image)
+            slices.append(image)
 
-        return image, torch.tensor(label, dtype=torch.long)
+        sample = torch.stack(slices, 0)
+        sample = torch.squeeze(sample)
+
+        return sample, torch.tensor(id, dtype=torch.long)
 
 
-ods = OASISDataset(f"{OASIS_PATH}/keras_png_slices_train")
-print(f"Length of dataset: {len(ods)}")
+def get_dataloader(data_type, batch_size):
+    # Load dataset for usage
+    if data_type == VALIDATE:
+        files_dir = f"{OASIS_PATH}/{VALIDATION_FOLDER}"
+    elif data_type == TEST:
+        files_dir = f"{OASIS_PATH}/{TESTING_FOLDER}"
+    else:
+        files_dir = f"{OASIS_PATH}/{TRAINING_FOLDER}"
+    files = OASISDataset(files_dir)
 
-# # Load dataset for usage
-# transform = transforms.Compose([
-#     transforms.ToTensor()
-#     ])
-# training_files_dir = f"{OASIS_PATH}/keras_png_slices_seg_train"
-# training_files = datasets.DatasetFolder(training_files_dir, transform=transform)
-# 
-# # Create a DataLoader to assist in the batching process
-# dataloader = torch.utils.data.DataLoader(training_files, batch_size=32,
-#                                          shuffle=True)
-# 
-# # See things
-# for images, labels in dataloader:
-#     print(f"Image batch shape: {images.shape}")
-#     print(f"Label batch shape: {labels.shape}")
-#     print(f"Image shape: {images[0][0].shape}")
-#     picture = transforms.functional.to_pil_image(images[0][0])
-#     picture.show()
-#     break
+    # Create a DataLoader to assist in the batching process
+    return torch.utils.data.DataLoader(files, batch_size=batch_size,
+                                       shuffle=True)
