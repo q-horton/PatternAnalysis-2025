@@ -9,7 +9,10 @@ load_dotenv()
 OASIS_PATH = os.getenv('OASIS_PATH')
 TRAINING_FOLDER = os.getenv('TRAINING_FOLDER')
 TESTING_FOLDER = os.getenv('TESTING_FOLDER')
-VALIDATION_FOLDER = os.getenv('VALIDATION_FOLDER')
+VAL_FOLDER = os.getenv('VALIDATION_FOLDER')
+TRAINING_SEG_FOLDER = os.getenv('TRAINING_SEG_FOLDER')
+TESTING_SEG_FOLDER = os.getenv('TESTING_SEG_FOLDER')
+VAL_SEG_FOLDER = os.getenv('VALIDATION_SEG_FOLDER')
 
 # Constant values
 TEST = 0
@@ -18,16 +21,17 @@ VALIDATE = 2
 
 
 class OASISDataset(torch.utils.data.Dataset):
-    def __init__(self, img_dir_path):
+    def __init__(self, oasis_path, data_path, truth_path):
         '''
         Loads the contents of the provided directory into an
         easily processed form.
         '''
         # Load all file names from the provided directory
-        files = os.listdir(f"{img_dir_path}")
+        files = os.listdir(f"{oasis_path}/{data_path}")
 
         # Initialise member variables
-        self.path = img_dir_path
+        self.path = oasis_path
+        self.dirs = [data_path, truth_path]
         self.files = files
         self.transform = transforms.Compose([
             transforms.Resize((256, 256)),
@@ -40,12 +44,18 @@ class OASISDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         # Load all slices of the sample
-        image = Image.open(f"{self.path}/{self.files[idx]}").convert('L')
-        image = self.transform(image)
+        raw_image = Image.open(f"{self.path}/{self.dirs[0]}/{self.files[idx]}").convert('L')
+        raw_image = self.transform(raw_image)
+        seg_file_mod = self.files[idx].split('_', 1)
+        seg_file_mod[0] = "seg"
+        seg_file = '_'.join(seg_file_mod)
+        seg_image = Image.open(f"{self.path}/{self.dirs[1]}/{seg_file}").convert('L')
+        seg_image = self.transform(seg_image)
 
-        return image, torch.tensor(idx, dtype=torch.long)
+        return raw_image, seg_image
 
 
+# Not in use, needs updating to get segmented truth data
 class OASISDataset_3D(torch.utils.data.Dataset):
     def __init__(self, img_dir_path):
         '''
@@ -109,12 +119,11 @@ class OASISDataset_3D(torch.utils.data.Dataset):
 def get_dataloader(data_type, batch_size, shuffle):
     # Load dataset for usage
     if data_type == VALIDATE:
-        files_dir = f"{OASIS_PATH}/{VALIDATION_FOLDER}"
+        files = OASISDataset(OASIS_PATH, VAL_FOLDER, VAL_SEG_FOLDER)
     elif data_type == TEST:
-        files_dir = f"{OASIS_PATH}/{TESTING_FOLDER}"
+        files = OASISDataset(OASIS_PATH, TESTING_FOLDER, TESTING_SEG_FOLDER)
     else:
-        files_dir = f"{OASIS_PATH}/{TRAINING_FOLDER}"
-    files = OASISDataset(files_dir)
+        files = OASISDataset(OASIS_PATH, TRAINING_FOLDER, TRAINING_SEG_FOLDER)
 
     # Create a DataLoader to assist in the batching process
     return torch.utils.data.DataLoader(files, batch_size=batch_size,

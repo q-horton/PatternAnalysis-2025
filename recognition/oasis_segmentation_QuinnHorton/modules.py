@@ -44,7 +44,7 @@ class LocalisationModule(nn.Module):
         # Creates localisation module (per Isensee et. al)
         self.localise = nn.Sequential(
             nn.Conv2d(2 * out_channels, 2 * out_channels, 3, padding=1),
-            nn.Conv2d(2 * out_channels, out_channels, 1, padding=1)
+            nn.Conv2d(2 * out_channels, out_channels, 1, padding=0)
         )
 
     def forward(self, x):
@@ -78,7 +78,7 @@ class UpStep(nn.Module):
 
     def forward(self, x, skip_conn):
         inter = self.upsample(x)
-        concat = torch.cat((inter, skip_conn), 0)
+        concat = torch.cat((inter, skip_conn), 1)
         logits = self.localise(concat)
         return logits
 
@@ -87,7 +87,7 @@ class UNet(nn.Module):
     def __init__(self):
         super().__init__()
         self.flatten = nn.Flatten()
-        self.in_conv = nn.Conv2d(256*256, 16, 3, padding=1)
+        self.in_conv = nn.Conv2d(1, 16, 3, padding=1)
         self.in_context = ContextModule(16)
         self.down1 = DownStep(16)
         self.down2 = DownStep(32)
@@ -98,25 +98,40 @@ class UNet(nn.Module):
         self.up3 = UpStep(32)
         # Segmentation layers?
         self.out_upsample = UpsampleModule(16)
-        self.out_conv = nn.Conv2d(16, 32, 3, padding=1)
+        self.out_conv = nn.Conv2d(32, 32, 3, padding=1)
         self.out_softmax = nn.Softmax2d()
 
     def forward(self, x):
-        x = self.flatten(x)
-        s1 = self.in_conv(x)
-        s2 = self.in_context(s1)
-        s3 = self.down1(s2)
-        s4 = self.down2(s3)
-        s5 = self.down3(s4)
-        s6 = self.down4(s5)
-        s7 = self.up1(s6, s5)
-        s8 = self.up2(s7, s4)
+        # x = self.flatten(x)  # 1 Channel
+        s1 = self.in_conv(x)  # 16 Channels
+        s2 = self.in_context(s1)  # 16 Channels
+        s3 = self.down1(s2)  # 32 Channels
+        s4 = self.down2(s3)  # 64 Channels
+        s5 = self.down3(s4)  # 128 Channels
+        s6 = self.down4(s5)  # 256 Channels
+        s7 = self.up1(s6, s5)  # 128 Channels
+        s8 = self.up2(s7, s4)  # 64 Channels
         # Segmentation?
-        s9 = self.up3(s8, s3)
+        s9 = self.up3(s8, s3)  # 32 Channels
         # Segmentation?
-        s10 = self.out_upsample(s9)
-        s11 = torch.cat((s10, s2), 0)
-        s12 = self.out_conv(s11)
+        s10 = self.out_upsample(s9)  # 16 Channels
+        s11 = torch.cat((s10, s2), 1)  # 32 Channels
+        s12 = self.out_conv(s11)  # 32 Channels
         # Segmentation?
         logits = self.out_softmax(s12)
         return logits
+
+
+# Uses the complement of the DSC as a loss criterion
+class DiceLoss(nn.Module):
+    def __init__(self, eps: float = 1e-8):
+        super().__init__()
+        self.eps = eps
+
+    def forward(self, input, target):
+        intersection = torch.eq(input, target)
+        card_int = torch.sum(intersection).item()
+        card_union = input.numel() + target.numel()
+
+        dice_coefficient = (2. * card_int + self.eps) / (card_union + self.eps)
+        return 1. - dice_coefficient
