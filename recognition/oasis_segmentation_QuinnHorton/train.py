@@ -1,16 +1,29 @@
+#!/usr/bin/env python3
+"""
+Filename: train.py
+Author: Quinn Horton (46975919)
+Date: 2025-11-02
+Version: 1.0
+Description: This file houses the code components responsible for training the
+    segmentation model and validating the accuracy of the trained model.
+"""
+
 import dataset
 import modules
 import torch
 from torch import nn
 
+# Ensures that GPU acceleration is used where available
 device = torch.accelerator.current_accelerator().type if\
     torch.accelerator.is_available() else "cpu"
 
 
+# Saves the trained weights to a file
 def save_model(model):
     torch.save(model.state_dict(), modules.PATH)
 
 
+# Runs the full training process
 def train_model():
     # Dataloaders
     train_dataloader = dataset.get_dataloader(dataset.TRAIN, 1, True)

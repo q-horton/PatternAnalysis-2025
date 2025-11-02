@@ -1,3 +1,13 @@
+#!/usr/bin/env python3
+"""
+Filename: dataset.py
+Author: Quinn Horton (46975919)
+Date: 2025-11-02
+Version: 1.0
+Description: This file houses the components responsible for importing the
+    dataset(s).
+"""
+
 from PIL import Image
 import os
 import torch

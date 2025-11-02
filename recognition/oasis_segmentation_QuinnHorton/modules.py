@@ -1,12 +1,24 @@
+#!/usr/bin/env python3
+"""
+Filename: modules.py
+Author: Quinn Horton (46975919)
+Date: 2025-11-02
+Version: 1.0
+Description: This file houses the various modules responsible for implementing
+    all elements of the focal segmentation model.
+"""
+
 import torch
 from torch import nn
-
-# Segmentation - ?
 
 MODEL_SAVE_PATH = "OASIS_Segmentation_Model_Data.pt"
 
 
 class ContextModule(nn.Module):
+    '''
+    Implementation of the 'Context Module' as described in Isensee
+    '''
+
     def __init__(self, in_channels):
         super().__init__()
 
@@ -25,6 +37,10 @@ class ContextModule(nn.Module):
 
 
 class UpsampleModule(nn.Module):
+    '''
+    Implementation of the 'Upsampling Module' as described in Isensee
+    '''
+
     def __init__(self, out_channels):
         super().__init__()
 
@@ -40,6 +56,10 @@ class UpsampleModule(nn.Module):
 
 
 class LocalisationModule(nn.Module):
+    '''
+    Implementation of the 'Localization Module' as described in Isensee
+    '''
+
     def __init__(self, out_channels):
         super().__init__()
 
@@ -55,6 +75,11 @@ class LocalisationModule(nn.Module):
 
 
 class DownStep(nn.Module):
+    '''
+    Generic implementation of the recurrent down steps made up of consecutive
+    2-stride convolution layers with context module.
+    '''
+
     def __init__(self, in_channels):
         super().__init__()
 
@@ -72,6 +97,11 @@ class DownStep(nn.Module):
 
 
 class UpStep(nn.Module):
+    '''
+    Generic implementation of the recurrent up steps made up of consecutive
+    upsampling and localisation modules, incorporating skip connections.
+    '''
+
     def __init__(self, out_channels):
         super().__init__()
 
@@ -86,6 +116,10 @@ class UpStep(nn.Module):
 
 
 class UNet(nn.Module):
+    '''
+    Implementation of the full Improved UNet model.
+    '''
+
     def __init__(self):
         super().__init__()
         self.flatten = nn.Flatten()
@@ -98,7 +132,6 @@ class UNet(nn.Module):
         self.up1 = UpStep(128)
         self.up2 = UpStep(64)
         self.up3 = UpStep(32)
-        # Segmentation layers?
         self.out_upsample = UpsampleModule(16)
         self.out_conv = nn.Conv2d(32, 32, 3, padding=1)
         self.out_softmax = nn.Softmax2d()
@@ -113,22 +146,20 @@ class UNet(nn.Module):
         s6 = self.down4(s5)  # 256 Channels
         s7 = self.up1(s6, s5)  # 128 Channels
         s8 = self.up2(s7, s4)  # 64 Channels
-        # Segmentation?
         s9 = self.up3(s8, s3)  # 32 Channels
-        # Segmentation?
         s10 = self.out_upsample(s9)  # 16 Channels
         s11 = torch.cat((s10, s2), 1)  # 32 Channels
         s12 = self.out_conv(s11)  # 32 Channels
-        # Segmentation?
         logits = self.out_softmax(s12)
         return logits
 
 
 # Implement the Dice Similarity Coefficient calculation
+# DSC = 2 |X ^ Y| / (|X| + |Y|)
 def DSC(input, target):
     intersection = torch.eq(input, target)
     card_int = torch.sum(intersection).item()
     card_union = input.numel() + target.numel()
 
-    dice_coefficient = (2. * card_int) / (card_union)
+    dice_coefficient = (2 * card_int) / (card_union)
     return dice_coefficient
