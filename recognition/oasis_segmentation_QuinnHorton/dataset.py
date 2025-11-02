@@ -106,7 +106,7 @@ class OASISDataset_3D(torch.utils.data.Dataset):
         return sample, torch.tensor(id, dtype=torch.long)
 
 
-def get_dataloader(data_type, batch_size):
+def get_dataloader(data_type, batch_size, shuffle):
     # Load dataset for usage
     if data_type == VALIDATE:
         files_dir = f"{OASIS_PATH}/{VALIDATION_FOLDER}"
@@ -118,4 +118,4 @@ def get_dataloader(data_type, batch_size):
 
     # Create a DataLoader to assist in the batching process
     return torch.utils.data.DataLoader(files, batch_size=batch_size,
-                                       shuffle=True)
+                                       shuffle=shuffle)
