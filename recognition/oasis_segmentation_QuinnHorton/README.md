@@ -20,6 +20,12 @@ The project is set about in the following files:
 - ***train.py:*** Runs the training system for the model and saves the model weights.
 - ***predict.py:*** Used to put the model into action and apply the trained model.
 
+## Training Results
+
+The following graph shows the training losses of the model.
+
+![Training Losses](./assets/training_error.png)
+
 ## Dependencies
 
 This has been developed using python version 3.13.9, and relies on the following other dependencies:
