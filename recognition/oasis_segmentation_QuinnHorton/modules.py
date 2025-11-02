@@ -3,6 +3,8 @@ from torch import nn
 
 # Segmentation - ?
 
+MODEL_SAVE_PATH = "OASIS_Segmentation_Model_Data.pt"
+
 
 class ContextModule(nn.Module):
     def __init__(self, in_channels):
@@ -122,16 +124,11 @@ class UNet(nn.Module):
         return logits
 
 
-# Uses the complement of the DSC as a loss criterion
-class DiceLoss(nn.Module):
-    def __init__(self, eps: float = 1e-8):
-        super().__init__()
-        self.eps = eps
+# Implement the Dice Similarity Coefficient calculation
+def DSC(input, target):
+    intersection = torch.eq(input, target)
+    card_int = torch.sum(intersection).item()
+    card_union = input.numel() + target.numel()
 
-    def forward(self, input, target):
-        intersection = torch.eq(input, target)
-        card_int = torch.sum(intersection).item()
-        card_union = input.numel() + target.numel()
-
-        dice_coefficient = (2. * card_int + self.eps) / (card_union + self.eps)
-        return 1. - dice_coefficient
+    dice_coefficient = (2. * card_int) / (card_union)
+    return dice_coefficient
